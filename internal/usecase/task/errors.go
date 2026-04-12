@@ -2,4 +2,6 @@ package task
 
 import "errors"
 
-var ErrInvalidInput = errors.New("invalid task input")
+var ErrTitleIsEmpty = errors.New("title is required")
+var ErrInvalidStatus = errors.New("invalid status")
+var ErrIdMustBetPositive = errors.New("id must be positive")

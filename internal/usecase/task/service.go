@@ -3,25 +3,27 @@ package task
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
-
 	taskdomain "example.com/taskservice/internal/domain/task"
 )
 
 type Service struct {
-	repo Repository
+	repo 		taskdomain.Repository
+	scheduler  	taskdomain.Scheduler
+	calculator  taskdomain.NextRunCalculator
 	now  func() time.Time
 }
 
-func NewService(repo Repository) *Service {
+func NewService(repo taskdomain.Repository, scheduler taskdomain.Scheduler, calculator taskdomain.NextRunCalculator) *Service {
 	return &Service{
 		repo: repo,
+		scheduler: scheduler,
+		calculator: calculator,
 		now:  func() time.Time { return time.Now().UTC() },
 	}
 }
 
-func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Task, error) {
+func (s *Service) Create(ctx context.Context, input taskdomain.CreateInput) (*taskdomain.Task, error) {
 	normalized, err := validateCreateInput(input)
 	if err != nil {
 		return nil, err
@@ -31,8 +33,17 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
+		Frequency:   normalized.Frequency,
 	}
 	now := s.now()
+	if !normalized.Frequency.IsEmpty() {
+		next_time, err := s.calculator.Calculate(*model, now)
+		if err != nil {
+			return nil, err
+		}
+		model.NextRunTime = next_time
+	}
+
 	model.CreatedAt = now
 	model.UpdatedAt = now
 
@@ -46,15 +57,15 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 
 func (s *Service) GetByID(ctx context.Context, id int64) (*taskdomain.Task, error) {
 	if id <= 0 {
-		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
+		return nil, fmt.Errorf("%w: %w", taskdomain.ErrInvalidInput, ErrIdMustBetPositive)
 	}
 
 	return s.repo.GetByID(ctx, id)
 }
 
-func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*taskdomain.Task, error) {
+func (s *Service) Update(ctx context.Context, id int64, input taskdomain.UpdateInput) (*taskdomain.Task, error) {
 	if id <= 0 {
-		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidInput)
+		return nil, fmt.Errorf("%w: %w", taskdomain.ErrInvalidInput, ErrIdMustBetPositive)
 	}
 
 	normalized, err := validateUpdateInput(input)
@@ -67,8 +78,17 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		Title:       normalized.Title,
 		Description: normalized.Description,
 		Status:      normalized.Status,
-		UpdatedAt:   s.now(),
+		Frequency:   normalized.Frequency,
 	}
+	now := s.now()
+	if !normalized.Frequency.IsEmpty() {
+		next_time, err := s.calculator.Calculate(*model, now)
+		if err != nil {
+			return nil, err
+		}
+		model.NextRunTime = next_time
+	}
+	model.UpdatedAt = now
 
 	updated, err := s.repo.Update(ctx, model)
 	if err != nil {
@@ -80,7 +100,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
-		return fmt.Errorf("%w: id must be positive", ErrInvalidInput)
+		return fmt.Errorf("%w: %w", taskdomain.ErrInvalidInput, ErrIdMustBetPositive)
 	}
 
 	return s.repo.Delete(ctx, id)
@@ -88,38 +108,4 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 
 func (s *Service) List(ctx context.Context) ([]taskdomain.Task, error) {
 	return s.repo.List(ctx)
-}
-
-func validateCreateInput(input CreateInput) (CreateInput, error) {
-	input.Title = strings.TrimSpace(input.Title)
-	input.Description = strings.TrimSpace(input.Description)
-
-	if input.Title == "" {
-		return CreateInput{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
-	}
-
-	if input.Status == "" {
-		input.Status = taskdomain.StatusNew
-	}
-
-	if !input.Status.Valid() {
-		return CreateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
-	}
-
-	return input, nil
-}
-
-func validateUpdateInput(input UpdateInput) (UpdateInput, error) {
-	input.Title = strings.TrimSpace(input.Title)
-	input.Description = strings.TrimSpace(input.Description)
-
-	if input.Title == "" {
-		return UpdateInput{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
-	}
-
-	if !input.Status.Valid() {
-		return UpdateInput{}, fmt.Errorf("%w: invalid status", ErrInvalidInput)
-	}
-
-	return input, nil
 }

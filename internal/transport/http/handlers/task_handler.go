@@ -9,14 +9,13 @@ import (
 	"github.com/gorilla/mux"
 
 	taskdomain "example.com/taskservice/internal/domain/task"
-	taskusecase "example.com/taskservice/internal/usecase/task"
 )
 
 type TaskHandler struct {
-	usecase taskusecase.Usecase
+	usecase taskdomain.Usecase
 }
 
-func NewTaskHandler(usecase taskusecase.Usecase) *TaskHandler {
+func NewTaskHandler(usecase taskdomain.Usecase) *TaskHandler {
 	return &TaskHandler{usecase: usecase}
 }
 
@@ -27,10 +26,11 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
+	created, err := h.usecase.Create(r.Context(), taskdomain.CreateInput{
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Frequency:	 req.Frequency,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -69,10 +69,11 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
+	updated, err := h.usecase.Update(r.Context(), id, taskdomain.UpdateInput{
 		Title:       req.Title,
 		Description: req.Description,
 		Status:      req.Status,
+		Frequency:	 req.Frequency,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -145,7 +146,7 @@ func writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, taskdomain.ErrNotFound):
 		writeError(w, http.StatusNotFound, err)
-	case errors.Is(err, taskusecase.ErrInvalidInput):
+	case errors.Is(err, taskdomain.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err)
 	default:
 		writeError(w, http.StatusInternalServerError, err)

@@ -15,6 +15,7 @@ import (
 	transporthttp "example.com/taskservice/internal/transport/http"
 	swaggerdocs "example.com/taskservice/internal/transport/http/docs"
 	httphandlers "example.com/taskservice/internal/transport/http/handlers"
+	scheduler "example.com/taskservice/internal/infrastructure/scheduler"
 	"example.com/taskservice/internal/usecase/task"
 )
 
@@ -36,7 +37,15 @@ func main() {
 	defer pool.Close()
 
 	taskRepo := postgresrepo.New(pool)
-	taskUsecase := task.NewService(taskRepo)
+
+    schedulerConfig := scheduler.Config{
+        CheckInterval: 1 * time.Minute,
+        WorkerCount:   5,
+    }
+
+    taskScheduler := scheduler.NewTaskScheduler(taskRepo, schedulerConfig)
+	calculator := scheduler.NewNextRunCalculator()
+	taskUsecase := task.NewService(taskRepo, taskScheduler, calculator)
 	taskHandler := httphandlers.NewTaskHandler(taskUsecase)
 	docsHandler := swaggerdocs.NewHandler()
 	router := transporthttp.NewRouter(taskHandler, docsHandler)
@@ -56,7 +65,12 @@ func main() {
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			logger.Error("shutdown http server", "error", err)
 		}
+		taskScheduler.Stop()
 	}()
+
+	if err := taskScheduler.Start(ctx); err != nil {
+		logger.Error("failed to start scheduler:", "err", err)
+	}
 
 	logger.Info("http server started", "addr", cfg.HTTPAddr)
 

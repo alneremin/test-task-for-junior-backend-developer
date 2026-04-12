@@ -53,3 +53,10 @@ http://localhost:8080/swagger/openapi.json
 - `GET /api/v1/tasks/{id}`
 - `PUT /api/v1/tasks/{id}`
 - `DELETE /api/v1/tasks/{id}`
+
+## Запуск тестов
+
+```bash
+docker compose --profile test run --rm test go test ./...
+```
+
