@@ -104,7 +104,7 @@ func (c *NextRunCalculatorImpl) CalculateSpecificDates(freq taskdomain.SpecificD
             freq.Hour, freq.Minute, 0, 0, fromTime.Location())
         
         // Добавляем только будущие даты
-        if dateTime.After(fromTime) || dateTime.Equal(fromTime) {
+        if dateTime.After(fromTime) {
             dates = append(dates, dateTime)
         }
     }
@@ -130,7 +130,7 @@ func (c *NextRunCalculatorImpl) CalculateParity(freq taskdomain.ParityFrequency,
         freq.Hour, freq.Minute, 0, 0, fromTime.Location())
     
     // Если время уже прошло сегодня, начинаем с завтра
-    if nextRun.Before(fromTime) {
+    if nextRun.Before(fromTime) || nextRun.Equal(fromTime) {
         nextRun = nextRun.AddDate(0, 0, 1)
     }
     
