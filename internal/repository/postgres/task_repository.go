@@ -160,7 +160,8 @@ func (r *Repository) GetTasksForExecution(ctx context.Context) ([]taskdomain.Tas
 		WHERE (next_run_time IS NULL OR next_run_time <= NOW())
 		AND frequency::jsonb IS NOT NULL
 		AND frequency::jsonb != '{}'::jsonb
-		AND frequency->>'type' IS NOT NULL;
+		AND frequency->>'type' IS NOT NULL
+		AND frequency->>'type' != '';
 	`
 
 	rows, err := r.pool.Query(ctx, query)
